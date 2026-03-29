@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CSV Analyst</title>
+<style>
+:root{--bg:#f8f9fa;--card:#fff;--bdr:#dee2e6;--pri:#4f46e5;--ph:#4338ca;--txt:#1f2937;--mut:#6b7280;--ok:#059669;--err:#dc2626;--r:10px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);line-height:1.6;padding:1rem}
+.ctr{max-width:860px;margin:0 auto}
+h1{font-size:1.6rem;font-weight:700;margin-bottom:.25rem}
+.sub{color:var(--mut);font-size:.9rem;margin-bottom:1.5rem}
+.card{background:var(--card);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem;margin-bottom:1rem;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.card h2{font-size:1.05rem;margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem}
+label{display:block;font-weight:600;font-size:.85rem;margin-bottom:.3rem}
+input[type=file],textarea{width:100%;padding:.55rem .75rem;border:1px solid var(--bdr);border-radius:6px;font-size:.9rem}
+input:focus,textarea:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px rgba(79,70,229,.15)}
+textarea{resize:vertical;min-height:56px}
+.btn{display:inline-flex;align-items:center;gap:.4rem;padding:.55rem 1.1rem;border:none;border-radius:6px;font-size:.88rem;font-weight:600;cursor:pointer;transition:background .15s}
+.bp{background:var(--pri);color:#fff}.bp:hover{background:var(--ph)}.bp:disabled{opacity:.5;cursor:not-allowed}
+.bs{padding:.35rem .75rem;font-size:.8rem}
+.bo{background:transparent;border:1px solid var(--bdr);color:var(--txt)}.bo:hover{background:#f3f4f6}
+.row{display:flex;gap:.5rem;align-items:flex-end}.row>:first-child{flex:1}
+.badge{display:inline-block;padding:.15rem .55rem;border-radius:99px;font-size:.75rem;font-weight:600}
+.badge-ok{background:#d1fae5;color:#065f46}
+.badge-fast{background:#ede9fe;color:#5b21b6}
+.fi{font-size:.85rem;color:var(--mut);margin-top:.5rem}.fi strong{color:var(--txt)}
+.tbl-wrap{max-height:320px;overflow:auto;margin-top:.75rem;border:1px solid var(--bdr);border-radius:6px}
+.tbl-wrap table{width:100%;border-collapse:collapse;font-size:.82rem}
+.tbl-wrap th{position:sticky;top:0;background:#f1f5f9;font-weight:600;text-align:left;padding:.45rem .6rem;border-bottom:2px solid var(--bdr);white-space:nowrap}
+.tbl-wrap td{padding:.35rem .6rem;border-bottom:1px solid #f0f0f0;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.tbl-wrap tr:hover td{background:#f8fafc}
+.tbl-info{font-size:.78rem;color:var(--mut);margin-top:.35rem;text-align:right}
+.stats summary{font-weight:600;font-size:.88rem;color:var(--pri);cursor:pointer}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.5rem;margin-top:.5rem}
+.stat-card{background:#f9fafb;border:1px solid var(--bdr);border-radius:6px;padding:.5rem .7rem}
+.stat-card .sn{font-weight:600;font-size:.85rem;margin-bottom:.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stat-card .sl{font-size:.75rem;color:var(--mut);line-height:1.5}
+#chat{max-height:520px;overflow-y:auto;display:flex;flex-direction:column;gap:.75rem;padding:.5rem 0}
+.msg{padding:.75rem 1rem;border-radius:var(--r);font-size:.9rem;max-width:92%;white-space:pre-wrap;word-wrap:break-word}
+.msg-user{background:var(--pri);color:#fff;align-self:flex-end;border-bottom-right-radius:2px}
+.msg-ai{background:#f3f4f6;align-self:flex-start;border-bottom-left-radius:2px}
+.msg-error{background:#fef2f2;color:var(--err);align-self:flex-start}
+.msg-instant{background:#ede9fe;align-self:flex-start;border-bottom-left-radius:2px}
+.ti{font-size:.72rem;color:var(--mut);text-align:right;margin-top:.15rem}
+.sp{display:inline-block;width:16px;height:16px;border:2px solid #e5e7eb;border-top-color:var(--pri);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+details{margin-top:.5rem}
+details>summary{cursor:pointer;font-weight:600;font-size:.88rem;color:var(--pri)}
+.dg{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.75rem}
+.di{background:#f9fafb;border:1px solid var(--bdr);border-radius:6px;padding:.65rem .85rem}
+.di .lb{font-size:.75rem;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.di .vl{font-size:1rem;font-weight:700}
+.hidden{display:none!important}.mt{margin-top:.75rem}
+.status-bar{background:#fefce8;border:1px solid #fde68a;border-radius:6px;padding:.5rem .75rem;font-size:.82rem;color:#92400e;margin-bottom:1rem}
+.status-bar.ok{background:#d1fae5;border-color:#6ee7b7;color:#065f46}
+.status-bar.err{background:#fef2f2;border-color:#fca5a5;color:var(--err)}
+</style>
+</head>
+<body>
+<div class="ctr">
+
+<!-- ============================================================ -->
+<!-- UPDATE THIS: Your deployed Apps Script /exec URL              -->
+<!-- ============================================================ -->
+
+<h1>📊 CSV Analyst</h1>
+<p class="sub">Upload a CSV and ask Claude about your data. Common stats answered instantly in your browser.</p>
+
+<div id="proxyStatus" class="status-bar">Checking connection to server...</div>
+
+<!-- CSV -->
+<div class="card">
+  <h2>📁 CSV File</h2>
+  <input type="file" id="csvFile" accept=".csv,.txt,.tsv">
+  <div id="uploadStatus" class="fi mt"></div>
+  <div id="fileInfo" class="hidden fi mt"></div>
+  <div id="statsWrap" class="hidden mt"></div>
+  <div id="previewWrap" class="hidden"></div>
+</div>
+
+<!-- Chat -->
+<div class="card">
+  <h2>💬 Ask a Question</h2>
+  <div id="chat"></div>
+  <div class="row mt">
+    <textarea id="question" placeholder="e.g. What is the average Revenue?" rows="2"></textarea>
+    <button class="btn bp" id="askBtn" onclick="doAsk()">Ask</button>
+  </div>
+  <div class="row mt" style="justify-content:space-between;align-items:center">
+    <span id="tokenTotal" class="ti"></span>
+    <button class="btn bs bo" onclick="clearChat()">Clear chat</button>
+  </div>
+</div>
+
+<!-- Details -->
+<div class="card">
+  <h2>ℹ️ Details & Limits</h2>
+  <details open>
+    <summary>Supported file specs</summary>
+    <div class="dg">
+      <div class="di"><div class="lb">Max file size</div><div class="vl">5 MB</div></div>
+      <div class="di"><div class="lb">Max data rows</div><div class="vl">10,000</div></div>
+      <div class="di"><div class="lb">Max columns</div><div class="vl">50</div></div>
+      <div class="di"><div class="lb">Formats</div><div class="vl">.csv .txt .tsv</div></div>
+    </div>
+  </details>
+  <details class="mt">
+    <summary>How it works</summary>
+    <p class="fi mt" style="line-height:1.7">
+      <strong>Model:</strong> Claude Sonnet 4 via Anthropic API (proxied through Apps Script).<br>
+      <strong>Instant answers:</strong> Sum, avg, min, max, median, count, unique — computed in your browser with no server call. Look for <span class="badge badge-fast">Instant ⚡</span>.<br>
+      <strong>Auto stats:</strong> Column-level statistics appear immediately after upload.<br>
+      <strong>Answer cache:</strong> Repeated questions return cached answers instantly.<br>
+      <strong>Smart context:</strong> ≤100 rows sends ALL data. Larger files send schema + 20-row preview.<br>
+      <strong>Multi-turn:</strong> Last 10 exchanges kept for follow-ups.
+    </p>
+  </details>
+  <details class="mt">
+    <summary>Privacy</summary>
+    <p class="fi mt" style="line-height:1.7">
+      CSV parsing + stats run 100% in your browser — your file never leaves the page.
+      When you ask a complex question, the CSV context + question are sent to an Apps Script proxy
+      which forwards it to Anthropic's API. No data is stored on any server.
+    </p>
+  </details>
+</div>
+
+</div><!-- end ctr -->
+
+<script>
+// ============================================================
+// UPDATE THIS with your deployed Apps Script URL
+// ============================================================
+var PROXY_URL = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec";
+
+var csvCtx = "", csvReady = false, hist = [], totalTok = 0, busy = false;
+var rawHd = [], rawDr = [];
+var answerCache = {};
+var MAX_ROWS = 10000, MAX_COLS = 50, SMALL = 100, PREV = 20, TBL_ROWS = 50;
+
+// ---- CSV Parser ----
+function parseCsv(text) {
+  var rows = [], row = [""], c = 0, inQ = false, i = 0, len = text.length;
+  while (i < len) {
+    var ch = text[i];
+    if (inQ) {
+      if (ch === '"' && text[i+1] === '"') { row[c] += '"'; i += 2; }
+      else if (ch === '"') { inQ = false; i++; }
+      else { row[c] += ch; i++; }
+    } else {
+      if (ch === '"') { inQ = true; i++; }
+      else if (ch === ',' || ch === '\t') { row[++c] = ""; i++; }
+      else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i+1] === '\n') i++;
+        rows.push(row); row = [""]; c = 0; i++;
+      } else { row[c] += ch; i++; }
+    }
+  }
+  if (row.length > 1 || row[0] !== "") rows.push(row);
+  return rows;
+}
+
+// ---- Stats Engine ----
+function colVals(ci) {
+  var v = []; for (var r = 0; r < rawDr.length; r++) { var x = rawDr[r][ci]; if (x != null && x !== "") v.push(x); } return v;
+}
+function colNums(ci) {
+  var n = []; for (var r = 0; r < rawDr.length; r++) { var x = rawDr[r][ci]; if (x != null && x !== "" && !isNaN(Number(x))) n.push(Number(x)); } return n;
+}
+function computeStats(ci) {
+  var vals = colVals(ci), nums = colNums(ci);
+  var s = { count: vals.length, empty: rawDr.length - vals.length, unique: new Set(vals).size };
+  if (nums.length > 0) {
+    s.isNum = true;
+    var sum = 0; for (var i = 0; i < nums.length; i++) sum += nums[i];
+    s.sum = sum; s.avg = sum / nums.length;
+    s.min = nums[0]; s.max = nums[0];
+    for (var i = 1; i < nums.length; i++) { if (nums[i] < s.min) s.min = nums[i]; if (nums[i] > s.max) s.max = nums[i]; }
+    var sorted = nums.slice().sort(function(a,b){return a-b;});
+    var mid = Math.floor(sorted.length / 2);
+    s.median = sorted.length % 2 ? sorted[mid] : (sorted[mid-1] + sorted[mid]) / 2;
+  } else { s.isNum = false; }
+  return s;
+}
+
+function buildStatsHtml() {
+  var html = '<details class="stats" open><summary>Column Statistics (computed instantly)</summary><div class="stat-grid">';
+  for (var c = 0; c < rawHd.length; c++) {
+    var s = computeStats(c);
+    html += '<div class="stat-card"><div class="sn">' + esc(rawHd[c]) + '</div><div class="sl">';
+    html += 'Rows: ' + s.count + ' | Empty: ' + s.empty + ' | Unique: ' + s.unique;
+    if (s.isNum) html += '<br>Sum: ' + fmt(s.sum) + ' | Avg: ' + fmt(s.avg) + '<br>Min: ' + fmt(s.min) + ' | Med: ' + fmt(s.median) + ' | Max: ' + fmt(s.max);
+    html += '</div></div>';
+  }
+  html += '</div></details>'; return html;
+}
+
+function fmt(n) { return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, {maximumFractionDigits:2}); }
+
+// ---- Local Answer Engine ----
+function tryLocal(q) {
+  var ql = q.toLowerCase().replace(/[?!.,]/g, "").trim();
+  if (/^(how many|number of|count|total)\s*(rows|records|entries|lines|data)/.test(ql)) return "There are " + rawDr.length + " data rows.";
+  if (/^(how many|number of|count)\s*(col|field|header)/.test(ql)) return "There are " + rawHd.length + " columns: " + rawHd.join(", ") + ".";
+  if (/^(list|show|what are)\s*(the\s*)?(col|field|header)/.test(ql)) return "Columns: " + rawHd.join(", ") + ".";
+
+  var col = matchCol(ql);
+  if (col !== null) {
+    var ci = col.ci, cn = col.name, rest = col.rest;
+    var nums = colNums(ci), vals = colVals(ci);
+
+    if (/\b(average|avg|mean)\b/.test(rest)) {
+      if (!nums.length) return cn + " is not numeric.";
+      var sum = 0; for (var i = 0; i < nums.length; i++) sum += nums[i];
+      return "Average of " + cn + ": " + fmt(sum / nums.length) + " (across " + nums.length + " values).";
+    }
+    if (/\b(sum|total|add up)\b/.test(rest) && !/rows|records/.test(rest)) {
+      if (!nums.length) return cn + " is not numeric.";
+      var sum = 0; for (var i = 0; i < nums.length; i++) sum += nums[i];
+      return "Sum of " + cn + ": " + fmt(sum) + ".";
+    }
+    if (/\b(min|minimum|lowest|smallest)\b/.test(rest)) {
+      if (!nums.length) return cn + " is not numeric.";
+      var m = nums[0]; for (var i = 1; i < nums.length; i++) if (nums[i] < m) m = nums[i];
+      return "Minimum of " + cn + ": " + fmt(m) + ".";
+    }
+    if (/\b(max|maximum|highest|largest|biggest)\b/.test(rest)) {
+      if (!nums.length) return cn + " is not numeric.";
+      var m = nums[0]; for (var i = 1; i < nums.length; i++) if (nums[i] > m) m = nums[i];
+      return "Maximum of " + cn + ": " + fmt(m) + ".";
+    }
+    if (/\b(median|middle)\b/.test(rest)) {
+      if (!nums.length) return cn + " is not numeric.";
+      var sorted = nums.slice().sort(function(a,b){return a-b;});
+      var mid = Math.floor(sorted.length / 2);
+      var med = sorted.length % 2 ? sorted[mid] : (sorted[mid-1] + sorted[mid]) / 2;
+      return "Median of " + cn + ": " + fmt(med) + ".";
+    }
+    if (/\b(unique|distinct|different)\b/.test(rest)) {
+      return cn + " has " + new Set(vals).size + " unique values out of " + vals.length + " total.";
+    }
+    if (/\b(count|how many)\b/.test(rest) && !/col|field/.test(rest)) {
+      return cn + " has " + vals.length + " non-empty values (" + (rawDr.length - vals.length) + " empty).";
+    }
+  }
+  return null;
+}
+
+function matchCol(ql) {
+  var best = null, bestLen = 0;
+  for (var c = 0; c < rawHd.length; c++) {
+    var cn = rawHd[c].toLowerCase();
+    if (ql.indexOf(cn) >= 0 && cn.length > bestLen) { best = c; bestLen = cn.length; }
+  }
+  if (best === null) return null;
+  return { ci: best, name: rawHd[best], rest: ql };
+}
+
+// ---- Preview Table ----
+function buildTable(hd, dr) {
+  var show = Math.min(TBL_ROWS, dr.length);
+  var t = '<div class="tbl-wrap"><table><thead><tr><th>#</th>';
+  for (var c = 0; c < hd.length; c++) t += '<th>' + esc(hd[c]) + '</th>';
+  t += '</tr></thead><tbody>';
+  for (var r = 0; r < show; r++) {
+    t += '<tr><td style="color:var(--mut)">' + (r+1) + '</td>';
+    for (var c = 0; c < hd.length; c++) t += '<td>' + esc(dr[r][c] || "") + '</td>';
+    t += '</tr>';
+  }
+  t += '</tbody></table></div>';
+  t += '<div class="tbl-info">' + (dr.length > show ? 'Showing ' + show + ' of ' + dr.length + ' rows' : dr.length + ' rows total') + '</div>';
+  return t;
+}
+
+// ---- Compressed Context Builder ----
+function buildCtx(name, hd, dr) {
+  var n = dr.length, L = ["CSV:" + name + "|" + n + "r|" + hd.length + "c"];
+  if (n <= SMALL) {
+    L.push("D:"); L.push(hd.join("|"));
+    for (var r = 0; r < n; r++) L.push(dr[r].join("|"));
+  } else {
+    L.push("S:");
+    for (var c = 0; c < hd.length; c++) {
+      var s = []; for (var r = 0; r < Math.min(3, n); r++) { var v = dr[r][c]; if (v != null && v !== "") s.push(v); }
+      L.push(hd[c] + ":" + s.join(","));
+    }
+    L.push("P:"); L.push(hd.join("|"));
+    for (var r = 0; r < Math.min(PREV, n); r++) L.push(dr[r].join("|"));
+    if (n > PREV) L.push(".." + (n - PREV) + "more");
+  }
+  L.push("Concise answers. Markdown tables ok.");
+  return L.join("\n");
+}
+
+// ---- File Handler ----
+document.getElementById("csvFile").addEventListener("change", function() {
+  var file = this.files[0]; if (!file) return;
+  var st = document.getElementById("uploadStatus");
+  var pw = document.getElementById("previewWrap");
+  var sw = document.getElementById("statsWrap");
+  pw.classList.add("hidden"); pw.innerHTML = "";
+  sw.classList.add("hidden"); sw.innerHTML = "";
+
+  if (file.size > 5*1024*1024) { st.innerHTML = "\u2717 File exceeds 5 MB"; return; }
+  st.innerHTML = "Parsing...";
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var t0 = performance.now();
+    var rows = parseCsv(e.target.result);
+    var ms = Math.round(performance.now() - t0);
+
+    if (rows.length < 2) { st.innerHTML = "\u2717 Need header + data"; return; }
+    var hd = rows[0], dr = rows.slice(1);
+    for (var i = 0; i < hd.length; i++) hd[i] = (hd[i] || "").trim();
+    if (dr.length > MAX_ROWS) { st.innerHTML = "\u2717 Too many rows (" + dr.length + ")"; return; }
+    if (hd.length > MAX_COLS) { st.innerHTML = "\u2717 Too many cols (" + hd.length + ")"; return; }
+
+    rawHd = hd; rawDr = dr; answerCache = {};
+    csvCtx = buildCtx(file.name, hd, dr);
+    csvReady = true; hist = []; totalTok = 0;
+    document.getElementById("tokenTotal").textContent = "";
+    document.getElementById("chat").innerHTML = "";
+    st.innerHTML = "\u2713 Parsed " + dr.length + " rows in " + ms + "ms";
+
+    var el = document.getElementById("fileInfo");
+    el.innerHTML = "<strong>" + esc(file.name) + "</strong> \u2014 " + dr.length + " rows \u00D7 " + hd.length + " cols";
+    el.classList.remove("hidden");
+
+    sw.innerHTML = buildStatsHtml(); sw.classList.remove("hidden");
+    pw.innerHTML = buildTable(hd, dr); pw.classList.remove("hidden");
+  };
+  reader.readAsText(file);
+});
+
+// ---- Ask (local engine → cache → proxy) ----
+async function doAsk() {
+  if (busy) return;
+  var q = document.getElementById("question").value.trim();
+  if (!q) return;
+  if (!csvReady) { alert("Upload a CSV first."); return; }
+  addMsg(q, "user");
+  document.getElementById("question").value = "";
+
+  // 1. Try local stats engine
+  var local = tryLocal(q);
+  if (local !== null) {
+    addMsg(local, "instant"); addTag("Instant \u26A1");
+    hist.push({role:"user",content:q},{role:"assistant",content:local});
+    return;
+  }
+
+  // 2. Try cache
+  var cacheKey = q.toLowerCase().trim();
+  if (answerCache[cacheKey]) {
+    addMsg(answerCache[cacheKey], "instant"); addTag("Cached \u26A1");
+    hist.push({role:"user",content:q},{role:"assistant",content:answerCache[cacheKey]});
+    return;
+  }
+
+  // 3. Call proxy
+  busy = true; setWait(true);
+  try {
+    var t0 = performance.now();
+    var res = await fetch(PROXY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ csvContext: csvCtx, question: q, history: hist.slice(-20) }),
+      redirect: "follow"
+    });
+    var data = await res.json();
+    var elapsed = Math.round(performance.now() - t0);
+
+    busy = false; setWait(false);
+
+    if (data.error) { addMsg("Error: " + data.error, "error"); return; }
+
+    addMsg(data.answer, "ai");
+    addTag("Claude \u00B7 " + elapsed + "ms");
+    answerCache[cacheKey] = data.answer;
+    hist.push({role:"user",content:q},{role:"assistant",content:data.answer});
+
+    if (data.usage) {
+      totalTok += (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0);
+      document.getElementById("tokenTotal").textContent =
+        "Tokens: " + totalTok.toLocaleString() +
+        " (last: " + (data.usage.input_tokens||0) + "in + " + (data.usage.output_tokens||0) + "out)";
+    }
+  } catch(e) {
+    busy = false; setWait(false);
+    addMsg("Network error: " + e.message, "error");
+  }
+}
+
+// Enter key
+document.getElementById("question").addEventListener("keydown", function(e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doAsk(); }
+});
+
+// ---- Helpers ----
+function addMsg(t, cls) {
+  var c = document.getElementById("chat"), d = document.createElement("div");
+  d.className = "msg msg-" + cls; d.textContent = t;
+  c.appendChild(d); c.scrollTop = c.scrollHeight;
+}
+function addTag(label) {
+  var c = document.getElementById("chat"), d = document.createElement("div");
+  d.style.cssText = "align-self:flex-start;margin-top:-0.5rem";
+  d.innerHTML = '<span class="badge badge-fast">' + label + '</span>';
+  c.appendChild(d);
+}
+function clearChat() {
+  hist = []; totalTok = 0;
+  document.getElementById("chat").innerHTML = "";
+  document.getElementById("tokenTotal").textContent = "";
+}
+function setWait(on) {
+  var b = document.getElementById("askBtn"); b.disabled = on;
+  b.innerHTML = on ? '<span class="sp"></span> Thinking...' : "Ask";
+  if (on) {
+    var c = document.getElementById("chat"), d = document.createElement("div");
+    d.className = "msg msg-ai"; d.id = "thk";
+    d.innerHTML = '<span class="sp"></span> Claude is analyzing...';
+    c.appendChild(d); c.scrollTop = c.scrollHeight;
+  } else {
+    var t = document.getElementById("thk"); if (t) t.remove();
+  }
+}
+function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+// ---- Proxy status check ----
+(async function checkProxy() {
+  var el = document.getElementById("proxyStatus");
+  if (PROXY_URL.indexOf("YOUR_DEPLOYMENT_ID") >= 0) {
+    el.className = "status-bar err";
+    el.textContent = "\u26A0 Update PROXY_URL in the HTML with your Apps Script deployment URL.";
+    return;
+  }
+  try {
+    var res = await fetch(PROXY_URL, { method: "POST", headers: {"Content-Type":"text/plain"}, body: JSON.stringify({question:"ping"}), redirect: "follow" });
+    if (res.ok) { el.className = "status-bar ok"; el.textContent = "\u2713 Connected to proxy server."; }
+    else { el.className = "status-bar err"; el.textContent = "\u2717 Proxy returned HTTP " + res.status; }
+  } catch(e) {
+    el.className = "status-bar err";
+    el.textContent = "\u2717 Cannot reach proxy: " + e.message;
+  }
+  setTimeout(function(){ el.style.display = "none"; }, 5000);
+})();
+</script>
+</body>
+</html>
