@@ -53,22 +53,19 @@ details>summary{cursor:pointer;font-weight:600;font-size:.88rem;color:var(--pri)
 .di .lb{font-size:.75rem;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
 .di .vl{font-size:1rem;font-weight:700}
 .hidden{display:none!important}.mt{margin-top:.75rem}
-.status-bar{background:#fefce8;border:1px solid #fde68a;border-radius:6px;padding:.5rem .75rem;font-size:.82rem;color:#92400e;margin-bottom:1rem}
-.status-bar.ok{background:#d1fae5;border-color:#6ee7b7;color:#065f46}
-.status-bar.err{background:#fef2f2;border-color:#fca5a5;color:var(--err)}
+.status-bar{border-radius:6px;padding:.5rem .75rem;font-size:.82rem;margin-bottom:1rem}
+.status-bar.checking{background:#fefce8;border:1px solid #fde68a;color:#92400e}
+.status-bar.ok{background:#d1fae5;border:1px solid #6ee7b7;color:#065f46}
+.status-bar.err{background:#fef2f2;border:1px solid #fca5a5;color:var(--err)}
 </style>
 </head>
 <body>
 <div class="ctr">
 
-<!-- ============================================================ -->
-<!-- UPDATE THIS: Your deployed Apps Script /exec URL              -->
-<!-- ============================================================ -->
-
 <h1>📊 CSV Analyst</h1>
-<p class="sub">Upload a CSV and ask Claude about your data. Common stats answered instantly in your browser.</p>
+<p class="sub">Upload a CSV and ask Claude about your data. Common stats answered instantly.</p>
 
-<div id="proxyStatus" class="status-bar">Checking connection to server...</div>
+<div id="proxyStatus" class="status-bar checking">Checking server connection...</div>
 
 <!-- CSV -->
 <div class="card">
@@ -109,11 +106,11 @@ details>summary{cursor:pointer;font-weight:600;font-size:.88rem;color:var(--pri)
   <details class="mt">
     <summary>How it works</summary>
     <p class="fi mt" style="line-height:1.7">
-      <strong>Model:</strong> Claude Sonnet 4 via Anthropic API (proxied through Apps Script).<br>
-      <strong>Instant answers:</strong> Sum, avg, min, max, median, count, unique — computed in your browser with no server call. Look for <span class="badge badge-fast">Instant ⚡</span>.<br>
-      <strong>Auto stats:</strong> Column-level statistics appear immediately after upload.<br>
-      <strong>Answer cache:</strong> Repeated questions return cached answers instantly.<br>
-      <strong>Smart context:</strong> ≤100 rows sends ALL data. Larger files send schema + 20-row preview.<br>
+      <strong>Model:</strong> Claude Sonnet 4 via Anthropic API.<br>
+      <strong>Instant answers:</strong> Sum, avg, min, max, median, count, unique — computed in your browser. Look for <span class="badge badge-fast">Instant ⚡</span>.<br>
+      <strong>Auto stats:</strong> Column statistics appear immediately after upload.<br>
+      <strong>Answer cache:</strong> Repeated questions return instantly.<br>
+      <strong>Smart context:</strong> ≤100 rows sends ALL data. Larger files send schema + preview.<br>
       <strong>Multi-turn:</strong> Last 10 exchanges kept for follow-ups.
     </p>
   </details>
@@ -121,23 +118,23 @@ details>summary{cursor:pointer;font-weight:600;font-size:.88rem;color:var(--pri)
     <summary>Privacy</summary>
     <p class="fi mt" style="line-height:1.7">
       CSV parsing + stats run 100% in your browser — your file never leaves the page.
-      When you ask a complex question, the CSV context + question are sent to an Apps Script proxy
-      which forwards it to Anthropic's API. No data is stored on any server.
+      For complex questions, the CSV context is sent through a secure proxy to Anthropic's API. No data is stored on any server.
     </p>
   </details>
 </div>
 
-</div><!-- end ctr -->
+</div>
 
 <script>
 // ============================================================
-// UPDATE THIS with your deployed Apps Script URL
+// UPDATE THIS with your Apps Script /exec URL
 // ============================================================
-var PROXY_URL = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec";
+var PROXY_URL = "https://script.google.com/a/macros/smartling.com/s/AKfycbwnUbvbX0ii8fXn3h7f9KYI-mHTqhMdWtR2p1yXYCBDhIcuqllpaldxyQ2OpjYPV9wv/exec";
+
+
 
 var csvCtx = "", csvReady = false, hist = [], totalTok = 0, busy = false;
-var rawHd = [], rawDr = [];
-var answerCache = {};
+var rawHd = [], rawDr = [], answerCache = {};
 var MAX_ROWS = 10000, MAX_COLS = 50, SMALL = 100, PREV = 20, TBL_ROWS = 50;
 
 // ---- CSV Parser ----
@@ -175,8 +172,7 @@ function computeStats(ci) {
   if (nums.length > 0) {
     s.isNum = true;
     var sum = 0; for (var i = 0; i < nums.length; i++) sum += nums[i];
-    s.sum = sum; s.avg = sum / nums.length;
-    s.min = nums[0]; s.max = nums[0];
+    s.sum = sum; s.avg = sum / nums.length; s.min = nums[0]; s.max = nums[0];
     for (var i = 1; i < nums.length; i++) { if (nums[i] < s.min) s.min = nums[i]; if (nums[i] > s.max) s.max = nums[i]; }
     var sorted = nums.slice().sort(function(a,b){return a-b;});
     var mid = Math.floor(sorted.length / 2);
@@ -184,20 +180,19 @@ function computeStats(ci) {
   } else { s.isNum = false; }
   return s;
 }
+function fmt(n) { return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, {maximumFractionDigits:2}); }
 
 function buildStatsHtml() {
-  var html = '<details class="stats" open><summary>Column Statistics (computed instantly)</summary><div class="stat-grid">';
+  var o = '<details class="stats" open><summary>Column Statistics (instant)</summary><div class="stat-grid">';
   for (var c = 0; c < rawHd.length; c++) {
     var s = computeStats(c);
-    html += '<div class="stat-card"><div class="sn">' + esc(rawHd[c]) + '</div><div class="sl">';
-    html += 'Rows: ' + s.count + ' | Empty: ' + s.empty + ' | Unique: ' + s.unique;
-    if (s.isNum) html += '<br>Sum: ' + fmt(s.sum) + ' | Avg: ' + fmt(s.avg) + '<br>Min: ' + fmt(s.min) + ' | Med: ' + fmt(s.median) + ' | Max: ' + fmt(s.max);
-    html += '</div></div>';
+    o += '<div class="stat-card"><div class="sn">' + esc(rawHd[c]) + '</div><div class="sl">';
+    o += 'Rows: ' + s.count + ' | Empty: ' + s.empty + ' | Unique: ' + s.unique;
+    if (s.isNum) o += '<br>Sum: ' + fmt(s.sum) + ' | Avg: ' + fmt(s.avg) + '<br>Min: ' + fmt(s.min) + ' | Med: ' + fmt(s.median) + ' | Max: ' + fmt(s.max);
+    o += '</div></div>';
   }
-  html += '</div></details>'; return html;
+  o += '</div></details>'; return o;
 }
-
-function fmt(n) { return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, {maximumFractionDigits:2}); }
 
 // ---- Local Answer Engine ----
 function tryLocal(q) {
@@ -207,52 +202,51 @@ function tryLocal(q) {
   if (/^(list|show|what are)\s*(the\s*)?(col|field|header)/.test(ql)) return "Columns: " + rawHd.join(", ") + ".";
 
   var col = matchCol(ql);
-  if (col !== null) {
-    var ci = col.ci, cn = col.name, rest = col.rest;
-    var nums = colNums(ci), vals = colVals(ci);
+  if (col === null) return null;
+  var ci = col.ci, cn = col.name, rest = col.rest;
+  var nums = colNums(ci), vals = colVals(ci);
 
-    if (/\b(average|avg|mean)\b/.test(rest)) {
-      if (!nums.length) return cn + " is not numeric.";
-      var sum = 0; for (var i = 0; i < nums.length; i++) sum += nums[i];
-      return "Average of " + cn + ": " + fmt(sum / nums.length) + " (across " + nums.length + " values).";
-    }
-    if (/\b(sum|total|add up)\b/.test(rest) && !/rows|records/.test(rest)) {
-      if (!nums.length) return cn + " is not numeric.";
-      var sum = 0; for (var i = 0; i < nums.length; i++) sum += nums[i];
-      return "Sum of " + cn + ": " + fmt(sum) + ".";
-    }
-    if (/\b(min|minimum|lowest|smallest)\b/.test(rest)) {
-      if (!nums.length) return cn + " is not numeric.";
-      var m = nums[0]; for (var i = 1; i < nums.length; i++) if (nums[i] < m) m = nums[i];
-      return "Minimum of " + cn + ": " + fmt(m) + ".";
-    }
-    if (/\b(max|maximum|highest|largest|biggest)\b/.test(rest)) {
-      if (!nums.length) return cn + " is not numeric.";
-      var m = nums[0]; for (var i = 1; i < nums.length; i++) if (nums[i] > m) m = nums[i];
-      return "Maximum of " + cn + ": " + fmt(m) + ".";
-    }
-    if (/\b(median|middle)\b/.test(rest)) {
-      if (!nums.length) return cn + " is not numeric.";
-      var sorted = nums.slice().sort(function(a,b){return a-b;});
-      var mid = Math.floor(sorted.length / 2);
-      var med = sorted.length % 2 ? sorted[mid] : (sorted[mid-1] + sorted[mid]) / 2;
-      return "Median of " + cn + ": " + fmt(med) + ".";
-    }
-    if (/\b(unique|distinct|different)\b/.test(rest)) {
-      return cn + " has " + new Set(vals).size + " unique values out of " + vals.length + " total.";
-    }
-    if (/\b(count|how many)\b/.test(rest) && !/col|field/.test(rest)) {
-      return cn + " has " + vals.length + " non-empty values (" + (rawDr.length - vals.length) + " empty).";
-    }
+  if (/\b(average|avg|mean)\b/.test(rest)) {
+    if (!nums.length) return cn + " is not numeric.";
+    var s = 0; for (var i = 0; i < nums.length; i++) s += nums[i];
+    return "Average of " + cn + ": " + fmt(s / nums.length) + " (" + nums.length + " values).";
+  }
+  if (/\b(sum|total|add up)\b/.test(rest) && !/rows|records/.test(rest)) {
+    if (!nums.length) return cn + " is not numeric.";
+    var s = 0; for (var i = 0; i < nums.length; i++) s += nums[i];
+    return "Sum of " + cn + ": " + fmt(s) + ".";
+  }
+  if (/\b(min|minimum|lowest|smallest)\b/.test(rest)) {
+    if (!nums.length) return cn + " is not numeric.";
+    var m = nums[0]; for (var i = 1; i < nums.length; i++) if (nums[i] < m) m = nums[i];
+    return "Minimum of " + cn + ": " + fmt(m) + ".";
+  }
+  if (/\b(max|maximum|highest|largest|biggest)\b/.test(rest)) {
+    if (!nums.length) return cn + " is not numeric.";
+    var m = nums[0]; for (var i = 1; i < nums.length; i++) if (nums[i] > m) m = nums[i];
+    return "Maximum of " + cn + ": " + fmt(m) + ".";
+  }
+  if (/\b(median|middle)\b/.test(rest)) {
+    if (!nums.length) return cn + " is not numeric.";
+    var sorted = nums.slice().sort(function(a,b){return a-b;});
+    var mid = Math.floor(sorted.length / 2);
+    var med = sorted.length % 2 ? sorted[mid] : (sorted[mid-1] + sorted[mid]) / 2;
+    return "Median of " + cn + ": " + fmt(med) + ".";
+  }
+  if (/\b(unique|distinct|different)\b/.test(rest)) {
+    return cn + " has " + new Set(vals).size + " unique values out of " + vals.length + ".";
+  }
+  if (/\b(count|how many)\b/.test(rest) && !/col|field/.test(rest)) {
+    return cn + " has " + vals.length + " non-empty values (" + (rawDr.length - vals.length) + " empty).";
   }
   return null;
 }
 
 function matchCol(ql) {
-  var best = null, bestLen = 0;
+  var best = null, bl = 0;
   for (var c = 0; c < rawHd.length; c++) {
     var cn = rawHd[c].toLowerCase();
-    if (ql.indexOf(cn) >= 0 && cn.length > bestLen) { best = c; bestLen = cn.length; }
+    if (ql.indexOf(cn) >= 0 && cn.length > bl) { best = c; bl = cn.length; }
   }
   if (best === null) return null;
   return { ci: best, name: rawHd[best], rest: ql };
@@ -274,7 +268,7 @@ function buildTable(hd, dr) {
   return t;
 }
 
-// ---- Compressed Context Builder ----
+// ---- Compressed Context ----
 function buildCtx(name, hd, dr) {
   var n = dr.length, L = ["CSV:" + name + "|" + n + "r|" + hd.length + "c"];
   if (n <= SMALL) {
@@ -335,7 +329,7 @@ document.getElementById("csvFile").addEventListener("change", function() {
   reader.readAsText(file);
 });
 
-// ---- Ask (local engine → cache → proxy) ----
+// ---- Ask: local → cache → Claude via proxy ----
 async function doAsk() {
   if (busy) return;
   var q = document.getElementById("question").value.trim();
@@ -344,43 +338,47 @@ async function doAsk() {
   addMsg(q, "user");
   document.getElementById("question").value = "";
 
-  // 1. Try local stats engine
+  // 1. Local stats engine
   var local = tryLocal(q);
   if (local !== null) {
     addMsg(local, "instant"); addTag("Instant \u26A1");
-    hist.push({role:"user",content:q},{role:"assistant",content:local});
+    hist.push({role:"user",content:q}, {role:"assistant",content:local});
     return;
   }
 
-  // 2. Try cache
-  var cacheKey = q.toLowerCase().trim();
-  if (answerCache[cacheKey]) {
-    addMsg(answerCache[cacheKey], "instant"); addTag("Cached \u26A1");
-    hist.push({role:"user",content:q},{role:"assistant",content:answerCache[cacheKey]});
+  // 2. Cache
+  var ck = q.toLowerCase().trim();
+  if (answerCache[ck]) {
+    addMsg(answerCache[ck], "instant"); addTag("Cached \u26A1");
+    hist.push({role:"user",content:q}, {role:"assistant",content:answerCache[ck]});
     return;
   }
 
-  // 3. Call proxy
+  // 3. Proxy to Claude
   busy = true; setWait(true);
   try {
     var t0 = performance.now();
     var res = await fetch(PROXY_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({ csvContext: csvCtx, question: q, history: hist.slice(-20) }),
+      body: JSON.stringify({
+        csvContext: csvCtx,
+        question: q,
+        history: hist.slice(-20)
+      }),
       redirect: "follow"
     });
+
     var data = await res.json();
     var elapsed = Math.round(performance.now() - t0);
-
     busy = false; setWait(false);
 
     if (data.error) { addMsg("Error: " + data.error, "error"); return; }
 
     addMsg(data.answer, "ai");
     addTag("Claude \u00B7 " + elapsed + "ms");
-    answerCache[cacheKey] = data.answer;
-    hist.push({role:"user",content:q},{role:"assistant",content:data.answer});
+    answerCache[ck] = data.answer;
+    hist.push({role:"user",content:q}, {role:"assistant",content:data.answer});
 
     if (data.usage) {
       totalTok += (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0);
@@ -430,23 +428,28 @@ function setWait(on) {
 }
 function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 
-// ---- Proxy status check ----
-(async function checkProxy() {
+// ---- Server connection check ----
+(async function() {
   var el = document.getElementById("proxyStatus");
-  if (PROXY_URL.indexOf("YOUR_DEPLOYMENT_ID") >= 0) {
+  if (PROXY_URL.indexOf("PASTE_YOUR") >= 0) {
     el.className = "status-bar err";
-    el.textContent = "\u26A0 Update PROXY_URL in the HTML with your Apps Script deployment URL.";
+    el.textContent = "\u26A0 Update PROXY_URL in index.html with your Apps Script deployment URL.";
     return;
   }
   try {
-    var res = await fetch(PROXY_URL, { method: "POST", headers: {"Content-Type":"text/plain"}, body: JSON.stringify({question:"ping"}), redirect: "follow" });
-    if (res.ok) { el.className = "status-bar ok"; el.textContent = "\u2713 Connected to proxy server."; }
-    else { el.className = "status-bar err"; el.textContent = "\u2717 Proxy returned HTTP " + res.status; }
+    var res = await fetch(PROXY_URL, { redirect: "follow" });
+    if (res.ok) {
+      el.className = "status-bar ok";
+      el.textContent = "\u2713 Connected to server.";
+      setTimeout(function(){ el.style.display = "none"; }, 3000);
+    } else {
+      el.className = "status-bar err";
+      el.textContent = "\u2717 Server returned HTTP " + res.status;
+    }
   } catch(e) {
     el.className = "status-bar err";
-    el.textContent = "\u2717 Cannot reach proxy: " + e.message;
+    el.textContent = "\u2717 Cannot reach server: " + e.message;
   }
-  setTimeout(function(){ el.style.display = "none"; }, 5000);
 })();
 </script>
 </body>
